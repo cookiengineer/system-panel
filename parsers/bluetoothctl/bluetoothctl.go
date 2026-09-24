@@ -2,6 +2,7 @@ package bluetoothctl
 
 import (
 	"bufio"
+	"strconv"
 	"strings"
 )
 
@@ -26,15 +27,15 @@ type Device struct {
 
 // Controller represents a Bluetooth adapter/controller.
 type Controller struct {
-	MAC       string
-	Name      string
-	Alias     string
-	Class     string
-	Powered   bool
+	MAC          string
+	Name         string
+	Alias        string
+	Class        string
+	Powered      bool
 	Discoverable bool
-	Pairable  bool
+	Pairable     bool
 	Discovering  bool
-	UUIDs     []string
+	UUIDs        []string
 }
 
 // ParseDevices parses "bluetoothctl devices" output.
@@ -175,19 +176,27 @@ func ParseShow(output string) *Controller {
 }
 
 func parseInt(s string) int {
-	var n int
-	neg := false
-	for i, c := range s {
-		if c == '-' && i < len(s)-1 && s[i+1] >= '0' && s[i+1] <= '9' {
-			neg = true
-			continue
-		}
-		if c >= '0' && c <= '9' {
-			n = n*10 + int(c-'0')
+	// Prefer an explicit decimal value in parentheses, e.g. "0xffffffa5 (-91)".
+	if start := strings.IndexByte(s, '('); start >= 0 {
+		if end := strings.IndexByte(s[start:], ')'); end > 0 {
+			if v, err := strconv.Atoi(strings.TrimSpace(s[start+1 : start+end])); err == nil {
+				return v
+			}
 		}
 	}
-	if neg {
-		n = -n
+
+	s = strings.TrimSpace(s)
+
+	// Parse hexadecimal values as signed 32-bit two's complement, e.g. "0xffffffa5".
+	if len(s) > 2 && (strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X")) {
+		if v, err := strconv.ParseUint(s[2:], 16, 32); err == nil {
+			return int(int32(uint32(v)))
+		}
 	}
-	return n
+
+	if v, err := strconv.Atoi(s); err == nil {
+		return v
+	}
+
+	return 0
 }

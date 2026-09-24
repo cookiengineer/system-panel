@@ -28,19 +28,21 @@ var Descriptor = view.ViewDescriptor{
 }
 
 type BluetoothView struct {
-	box         *gtk4.Box
-	model       *model.BluetoothModel
-	listBox     *gtk4.ListBox
-	connectBtn  *gtk4.Button
-	refreshBtn  *gtk4.Button
-	spinner     *gtk4.Spinner
-	devices     []btDeviceItem
-	rowPtrToIdx map[unsafe.Pointer]int
-	sectionRows []*gtk4.ListBoxRow
-	parentWin   *gtk4.Window
-	selectedMAC string
-	scanning    bool
-	mu          sync.Mutex
+	box            *gtk4.Box
+	model          *model.BluetoothModel
+	listBox        *gtk4.ListBox
+	connectBtn     *gtk4.Button
+	refreshBtn     *gtk4.Button
+	spinner        *gtk4.Spinner
+	devices        []btDeviceItem
+	rowPtrToIdx    map[unsafe.Pointer]int
+	sectionRows    []*gtk4.ListBoxRow
+	parentWin      *gtk4.Window
+	selectedMAC    string
+	suppressSelect bool
+	daemonRunning  bool
+	scanning       bool
+	mu             sync.Mutex
 }
 
 type btDeviceItem struct {
@@ -90,7 +92,11 @@ func NewBluetoothView() *BluetoothView {
 
 	bv.refreshBtn = gtk4.ButtonNewWithLabel("Refresh")
 	bv.refreshBtn.OnClicked(func() {
-		bv.checkDaemonAndConfigureButton()
+		if bv.daemonRunning {
+			bv.startScan()
+		} else {
+			bv.startBluetoothDaemon()
+		}
 	})
 	rbw := bv.refreshBtn.Widget
 	btnBox.Append(&rbw)
@@ -123,12 +129,12 @@ func (bv *BluetoothView) SetParentWindow(parent *gtk4.Window) { bv.parentWin = p
 func (bv *BluetoothView) checkDaemonAndConfigureButton() {
 	running := bv.model.IsServiceRunning()
 	if running {
+		bv.daemonRunning = true
 		bv.refreshBtn.SetLabel("Refresh")
-		bv.refreshBtn.OnClicked(func() { bv.startScan() })
 		bv.loadInitial()
 	} else {
+		bv.daemonRunning = false
 		bv.refreshBtn.SetLabel("Start Bluetooth Daemon")
-		bv.refreshBtn.OnClicked(func() { bv.startBluetoothDaemon() })
 	}
 }
 
@@ -188,8 +194,9 @@ func (bv *BluetoothView) startScan() {
 }
 
 func (bv *BluetoothView) populateList(devices []model.BluetoothDevice) {
-	bv.selectedMAC = ""
+	prevMAC := bv.selectedMAC
 
+	bv.suppressSelect = true
 	for _, item := range bv.devices {
 		bv.listBox.Remove(item.row)
 	}
@@ -199,6 +206,7 @@ func (bv *BluetoothView) populateList(devices []model.BluetoothDevice) {
 	bv.devices = bv.devices[:0]
 	bv.sectionRows = bv.sectionRows[:0]
 	bv.rowPtrToIdx = make(map[unsafe.Pointer]int)
+	bv.suppressSelect = false
 
 	for _, d := range devices {
 		bv.devices = append(bv.devices, btDeviceItem{
@@ -243,7 +251,17 @@ func (bv *BluetoothView) populateList(devices []model.BluetoothDevice) {
 		idx++
 	}
 
+	// Restore the previous selection so polling refreshes do not clear it.
+	bv.selectedMAC = ""
 	bv.connectBtn.SetSensitive(false)
+	if prevMAC != "" {
+		for i := range bv.devices {
+			if bv.devices[i].device.MAC == prevMAC {
+				bv.listBox.SelectRow(bv.devices[i].row)
+				break
+			}
+		}
+	}
 }
 
 func (bv *BluetoothView) createSectionLabel(text string) *gtk4.ListBoxRow {
@@ -315,6 +333,10 @@ func (bv *BluetoothView) createDeviceRow(item *btDeviceItem) *gtk4.ListBoxRow {
 }
 
 func (bv *BluetoothView) onRowSelected(row *gtk4.ListBoxRow) {
+	if bv.suppressSelect {
+		return
+	}
+
 	bv.selectedMAC = ""
 	bv.connectBtn.SetSensitive(false)
 
@@ -329,14 +351,37 @@ func (bv *BluetoothView) onConnectClicked() {
 	if bv.selectedMAC == "" {
 		return
 	}
-	bv.model.Connect(bv.selectedMAC)
-	bv.loadInitial()
+	mac := bv.selectedMAC
+
+	paired := false
+	for i := range bv.devices {
+		if bv.devices[i].device.MAC == mac {
+			paired = bv.devices[i].paired
+			break
+		}
+	}
+
+	bv.connectBtn.SetSensitive(false)
+	bv.connectBtn.SetLabel("Connecting...")
+
+	go func() {
+		if !paired {
+			bv.model.Pair(mac)
+			bv.model.Trust(mac)
+		}
+		bv.model.Connect(mac)
+
+		gtk4.IdleAdd(func() {
+			bv.connectBtn.SetLabel("Connect")
+			bv.loadInitial()
+		})
+	}()
 }
 
 func (bv *BluetoothView) Widget() *gtk4.Widget { return &bv.box.Widget }
-func (bv *BluetoothView) Name() string          { return "bluetooth" }
-func (bv *BluetoothView) Title() string         { return "Bluetooth" }
-func (bv *BluetoothView) IconName() string      { return "bluetooth-active-symbolic" }
-func (bv *BluetoothView) OnShow()               { bv.checkDaemonAndConfigureButton() }
-func (bv *BluetoothView) OnHide()               {}
-func (bv *BluetoothView) Destroy()              {}
+func (bv *BluetoothView) Name() string         { return "bluetooth" }
+func (bv *BluetoothView) Title() string        { return "Bluetooth" }
+func (bv *BluetoothView) IconName() string     { return "bluetooth-active-symbolic" }
+func (bv *BluetoothView) OnShow()              { bv.checkDaemonAndConfigureButton() }
+func (bv *BluetoothView) OnHide()              {}
+func (bv *BluetoothView) Destroy()             {}

@@ -1,19 +1,19 @@
 .PHONY: build install uninstall clean run
 
-APP_NAME := systempanel
+BINARY := system-panel
 GO := go
 PREFIX := /usr
 
 build:
-	$(GO) build -o $(APP_NAME) .
+	$(GO) build -o $(BINARY) .
 
 install: build
-	install -Dm755 $(APP_NAME) $(DESTDIR)$(PREFIX)/bin/$(APP_NAME)
-	install -Dm644 assets/systempanel.desktop $(DESTDIR)$(PREFIX)/share/applications/systempanel.desktop
+	install -Dm755 $(BINARY) $(DESTDIR)$(PREFIX)/bin/$(BINARY)
+	install -Dm644 assets/system-panel.desktop $(DESTDIR)$(PREFIX)/share/applications/system-panel.desktop
 
 uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/$(APP_NAME)
-	rm -f $(DESTDIR)$(PREFIX)/share/applications/systempanel.desktop
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(BINARY)
+	rm -f $(DESTDIR)$(PREFIX)/share/applications/system-panel.desktop
 
 clean:
 	rm -f $(APP_NAME)
