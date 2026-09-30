@@ -3,7 +3,7 @@ pkgver=r22.6e71ed7
 pkgrel=1
 pkgdesc="Adaptive GTK4 system control panel"
 arch=('x86_64' 'aarch64')
-url="https://github.com/cookiengineer/systempanel"
+url="https://github.com/cookiengineer/system-panel"
 license=('GPL-3.0-or-later')
 depends=('gtk4')
 makedepends=('go' 'git')
@@ -22,7 +22,7 @@ optdepends=(
 	'util-linux: Disks View (lsblk)'
 	'xorg-xrandr: Monitors view'
 )
-source=("${pkgname%-git}::git+https://github.com/cookiengineer/systempanel.git")
+source=("${pkgname%-git}::git+https://github.com/cookiengineer/system-panel.git")
 sha256sums=('SKIP')
 
 pkgver() {
@@ -37,7 +37,7 @@ build() {
 
 package() {
 	cd "${pkgname%-git}"
-	install -Dm755 systempanel "${pkgdir}/usr/bin/systempanel"
-	install -Dm644 assets/systempanel.desktop "${pkgdir}/usr/share/applications/systempanel.desktop"
-	install -Dm644 GPL-3.0-or-later.txt "${pkgdir}/usr/share/licenses/systempanel/LICENSE"
+	install -Dm755 systempanel "${pkgdir}/usr/bin/system-panel"
+	install -Dm644 assets/systempanel.desktop "${pkgdir}/usr/share/applications/system-panel.desktop"
+	install -Dm644 GPL-3.0-or-later.txt "${pkgdir}/usr/share/licenses/system-panel/LICENSE"
 }
