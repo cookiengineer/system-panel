@@ -1,5 +1,5 @@
-pkgname=systempanel-git
-pkgver=r22.6e71ed7
+pkgname=system-panel-git
+pkgver=r27.e79e2a3
 pkgrel=1
 pkgdesc="Adaptive GTK4 system control panel"
 arch=('x86_64' 'aarch64')
@@ -32,12 +32,12 @@ pkgver() {
 
 build() {
 	cd "${pkgname%-git}"
-	go build -o systempanel .
+	go build -o system-panel .
 }
 
 package() {
 	cd "${pkgname%-git}"
-	install -Dm755 systempanel "${pkgdir}/usr/bin/system-panel"
-	install -Dm644 assets/systempanel.desktop "${pkgdir}/usr/share/applications/system-panel.desktop"
+	install -Dm755 system-panel "${pkgdir}/usr/bin/system-panel"
+	install -Dm644 assets/system-panel.desktop "${pkgdir}/usr/share/applications/system-panel.desktop"
 	install -Dm644 GPL-3.0-or-later.txt "${pkgdir}/usr/share/licenses/system-panel/LICENSE"
 }
